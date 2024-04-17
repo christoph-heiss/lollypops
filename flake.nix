@@ -182,15 +182,20 @@
                             cmds = [
                               (if hostConfig.config.lollypops.deployment.local-evaluation then
                                 ''
-                                  ${optionalString useSudo ''NIX_SSHOPTS="{{.REMOTE_SSH_OPTS}}"''} nixos-rebuild {{.REBUILD_ACTION}} \
-                                    --flake '{{.LOCAL_FLAKE_SOURCE}}#{{.HOSTNAME}}' \
-                                    --target-host {{.REMOTE_USER}}@{{.REMOTE_HOST}} \
-                                    ${optionalString useSudo "--use-remote-sudo"}
+                                ${optionalString useSudo ''NIX_SSHOPTS="{{.REMOTE_SSH_OPTS}}"''} \
+                                    nix-shell -p git --run ' \
+                                      nixos-rebuild {{.REBUILD_ACTION}} \
+                                      --flake '{{.LOCAL_FLAKE_SOURCE}}#{{.HOSTNAME}}' \
+                                      --target-host {{.REMOTE_USER}}@{{.REMOTE_HOST}} \
+                                      ${optionalString useSudo "--use-remote-sudo"} \
+                                    '
                                 '' else ''
-                                {{.REMOTE_COMMAND}} {{.REMOTE_SSH_OPTS}} {{.REMOTE_USER}}@{{.REMOTE_HOST}} \
-                                  '${optionalString useSudo "{{.REMOTE_SUDO_COMMAND}} {{.REMOTE_SUDO_OPTS}}"} nixos-rebuild {{.REBUILD_ACTION}} \
-                                  --flake "$(readlink -f {{.REMOTE_CONFIG_DIR}}/flake)#{{.HOSTNAME}}"'
-                              '')
+                                  flake="$(readlink -f {{.REMOTE_CONFIG_DIR}}/flake)#{{.HOSTNAME}}"; \
+                                  sudocmd="${optionalString useSudo "{{.REMOTE_SUDO_COMMAND}} {{.REMOTE_SUDO_OPTS}}"}"; \
+                                  rebuildcmd="nixos-rebuild {{.REBUILD_ACTION}} --flake "''${flake}""; \
+                                  {{.REMOTE_COMMAND}} {{.REMOTE_SSH_OPTS}} {{.REMOTE_USER}}@{{.REMOTE_HOST}} \
+                                    "nix-shell -p git --run ' ''${sudocmd} ''$rebuildcmd '"
+                                '')
                             ];
                           };
 
